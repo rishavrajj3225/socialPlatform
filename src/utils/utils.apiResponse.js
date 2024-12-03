@@ -4,6 +4,5 @@ class apiResponse{
         this.data=data
         this.message=message
         this.success=statuscode<400
-
     }
 }
