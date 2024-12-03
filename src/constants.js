@@ -1,1 +1,1 @@
-export const DB_NAME= "codeback"
+export const DB_NAME= "codeback";
