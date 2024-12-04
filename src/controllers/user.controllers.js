@@ -40,12 +40,16 @@ const registerUser = asynchandler(async (req, res) => {
 
   //  req.file is given by multer
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverimageLocalPath = req.files?.coverimage[0]?.path;
- 
-  
   if (!avatarLocalPath) {
     throw new apiError(400, "Avatar not found1");
   }
+  // aisa statment likhne ke baad humlog ko zarur se check kr lena hai ki field exist krta hai ki nhi kyunki agar exist nhi krta hai to undifined dega aur error dega jab hum uska .url access karenge 
+  // const coverimageLocalPath = req.files?.coverimage[0]?.path;   
+  let coverimageLocalPath="";
+  if (req.files && Array.isArray(req.files.coverimage) && req.files.coverimage.lenth>0){
+    coverimageLocalPath = req.files?.coverimage[0]?.path;
+  }
+    
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
   const coverimage = await uploadOnCloudinary(coverimageLocalPath);
@@ -58,7 +62,7 @@ const registerUser = asynchandler(async (req, res) => {
     coverimage: coverimage?.url ||"",
     email,
     password,
-    username: username,
+    username: username.toLowerCase(),
   });
   // yaha pe humko fir se ek baar dekhna padega ki user banega ki nhi
   const createdUser = await User.findById(user._id).select(
