@@ -1,4 +1,4 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
     },
     watchHistory: [
       {
-        type: Schema.type.Types.Objectid,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Video",
       },
     ],
@@ -56,7 +56,7 @@ const userSchema = new mongoose.Schema(
 
 userSchema.pre("save",async function (next) {
     if(!this.isModified("password")) return next();
-    this.password=bcrypt.hash(this.password,10);// jisko hash krna hai uska name and number of round to hash and this will change the password everytime means if we just change name then it will automatically change password also to avoide this we prefere to control it with if statment
+    this.password= await bcrypt.hash(this.password,10);// jisko hash krna hai uska name and number of round to hash and this will change the password everytime means if we just change name then it will automatically change password also to avoide this we prefere to control it with if statment
     next();
 })
 
