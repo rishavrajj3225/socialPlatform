@@ -15,53 +15,61 @@ const registerUser = asynchandler(async (req, res) => {
   // return response
 
   const { fullName, username, email, password } = req.body; // form ya json se data aa rha hai to req.body se mil jayega mujhe
-  console.log(email);
-  console.log(password);
   //   if(fullName===""){
   //     throw new apiError(400,"Full name is required")
   //   }
   // we  can check by if condition on every field but we can also use .some function
+
   if (
     [fullName, username, email, password].some((data) => data?.trim() === "")
   ) {
     throw new apiError(400, "Please fill the compulsory fields");
   }
   // jo user ko import kiye hai wo data base se intract kr shkta hai kyunki wo mongoose se bna hai means user hi mere behalf pe mongodb ko call karega
-  const existedUser = User.findOne({
+  const existedUser = await User.findOne({
     $or: [{ username }, { email }],
   });
   if (existedUser)
     throw new apiError(400, "User already exist with username or email");
+  // if(await User.find({email})){
+  //    throw new apiError(400, "User already exist with this email");
+  // }
+  // if(await User.find({username})){
+  //    throw new apiError(400, "User already exist with this username");
+  // }
 
   //  req.file is given by multer
   const avatarLocalPath = req.files?.avatar[0]?.path;
   const coverimageLocalPath = req.files?.coverimage[0]?.path;
+ 
+  
   if (!avatarLocalPath) {
-    throw new apiError(400, "Avatar not found");
+    throw new apiError(400, "Avatar not found1");
   }
+
   const avatar = await uploadOnCloudinary(avatarLocalPath);
   const coverimage = await uploadOnCloudinary(coverimageLocalPath);
-  if(!avatar){
-    throw new apiError(400, "Avatar not found");
+  if (!avatar) {
+    throw new apiError(400, "Avatar not found2");
   }
-   const user = await User.create({
+  const user = await User.create({
     fullName,
     avatar: avatar.url,
-    coverimage: coverimage?.url||"",
+    coverimage: coverimage?.url ||"",
     email,
     password,
-    username : username.toLowerCase()
-  })
+    username: username,
+  });
   // yaha pe humko fir se ek baar dekhna padega ki user banega ki nhi
- const createdUser = await User.findById(user._id).select(
-    // select statment by default sabko select krleta hai to usme se humko remove krna padega kuch kuch 
-   "-password -refreshToken"
- );
- if(!createdUser){
-    throw new apiError(500,"Somthing Went wrong while registring a user");
- }
-  return res.status(201).json(
-   new  apiResponse(200,createdUser,"User created successfully")
-)
+  const createdUser = await User.findById(user._id).select(
+    // select statment by default sabko select krleta hai to usme se humko remove krna padega kuch kuch
+    "-password -refreshToken"
+  );
+  if (!createdUser) {
+    throw new apiError(500, "Somthing Went wrong while registring a user");
+  }
+  return res
+    .status(201)
+    .json(new apiResponse(200, createdUser, "User created successfully"));
 });
 export { registerUser };
