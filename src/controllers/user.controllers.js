@@ -201,9 +201,9 @@ const refreshAccessToken = asynchandler(async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET
     );
     const user = await User.findById(decodedToken?._id);
-  
+
     if (!user) throw new apiError(401, "Invalid Refresh token");
-  
+
     //ab yaha pe incoming wala refresh token v aa gya hai and ek user ke pass hum save krwa ke rakhe the naa to match krwa lete hai
     if (incomingRefreshToken !== user.refreshToken)
       throw new apiError(401, " refresh token is expired");
@@ -211,20 +211,79 @@ const refreshAccessToken = asynchandler(async (req, res) => {
       httpOnly: true,
       secure: true,
     };
-    const { accessToken, newrefreshToken } = await generateAccessAndRefreshToken(
-      user._id
-    );
-  
+    const { accessToken, newrefreshToken } =
+      await generateAccessAndRefreshToken(user._id);
+
     return res
       .status(201)
       .cookie("accessToken:", accessToken)
       .cookie("refreshToken:", newrefreshToken)
-      .json(new apiResponse(200,
-        {accessToken,refreshToken:newrefreshToken},
-        "refreshToken refreshed"
-    ))
+      .json(
+        new apiResponse(
+          200,
+          { accessToken, refreshToken: newrefreshToken },
+          "refreshToken refreshed"
+        )
+      );
   } catch (error) {
-    throw new apiError(401,"error in refreshing the token")
+    throw new apiError(401, "error in refreshing the token");
   }
 });
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+
+const changeCurrentPassword = asynchandler(async (req, res) => {
+  const { oldPassword, newPassword, confirmNewPassword } = req.body;
+  // yaha pe user change krna chah rha hai to surely wo logged in hoga means hum req.user se uska id le shkte hai
+  if (newPassword != confirmNewPassword)
+    throw new apiError(400, "Confirm Password must be same as new one");
+
+  const user = await User.findById(req.user?._id);
+
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  if (!isPasswordCorrect) throw new apiError(400, "Old Password is incorrect");
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, {}, "password updated successfully"));
+});
+
+
+const getCurrentUser = asynchandler(async (req, res) => {
+  return res
+    .status(200)
+    .json(200, req.user, "Current User Fetched Successfully");
+});
+
+const updateAccountDetails = asynchandler(async (req, res) => {
+  const { fullName, email } = req.body;
+
+  if (!fullName || !email) {
+    throw new apiError(400, "All fields are required");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        fullName,
+        email: email,
+      },
+    },
+    { new: true }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Account details updated successfully"));
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+};
