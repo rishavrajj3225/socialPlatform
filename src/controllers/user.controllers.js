@@ -249,7 +249,6 @@ const changeCurrentPassword = asynchandler(async (req, res) => {
     .json(new apiResponse(200, {}, "password updated successfully"));
 });
 
-
 const getCurrentUser = asynchandler(async (req, res) => {
   return res
     .status(200)
@@ -279,6 +278,42 @@ const updateAccountDetails = asynchandler(async (req, res) => {
     .json(new ApiResponse(200, user, "Account details updated successfully"));
 });
 
+const updateUserAvatar= asynchandler(async(req,res)=>{
+ const avatarLocalPath= req.file?.path;
+ if(!avatarLocalPath) throw new apiError(400,"File not avaliable ");
+  const avatar=await uploadOnCloudinary(avatarLocalPath);
+  if(!avatar.url){
+    throw apiError(500,"Somthing went wrong on Avtar update");
+  }
+ const user= await User.findByIdAndUpdate(req.user?._id,{
+    $set:{
+      avatar : avatar.url
+    }
+  },{new:true}).select("-password");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar updated successfully"));
+})
+
+const updateUserCoverImage= asynchandler(async(req,res)=>{
+ const CoverImageLocalPath= req.file?.path;
+ if(!CoverImageLocalPath) throw new apiError(400,"File not avaliable ");
+  const coverimage=await uploadOnCloudinary(CoverImageLocalPath);
+  if(!coverimage.url){
+    throw apiError(500,"Somthing went wrong on Cover Image update");
+  }
+  const user=await User.findByIdAndUpdate(req.user?._id,{
+    $set:{
+     coverimage:coverimage.url
+    }
+  },
+  {new:true}).select("-password");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Cover Image updated successfully"));
+})
+
+
 export {
   registerUser,
   loginUser,
@@ -286,4 +321,7 @@ export {
   refreshAccessToken,
   changeCurrentPassword,
   getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatar,
+  updateUserCoverImage
 };
