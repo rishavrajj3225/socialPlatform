@@ -3,21 +3,31 @@ import { apiError } from "../utils/apierror.utils.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/fileuplod.utils.js";
 import { apiResponse } from "../utils/apiResponse.utils.js";
+import jwt from "jsonwebtoken";
 // user ke pass humlog ke function ka access hoga and User ke pass mongo ke function ka access hoga
-const generateAccessAndRefreshToken = async (UserId) => {
+const generateAccessAndRefreshToken = async (userId) => {
   try {
-    const user = await User.findOne(userId);
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) throw new apiError(404, "User not found");
+
+    // Generate access and refresh tokens
+    const accessToken = user.generateAccessToken(); // Assuming method exists in the User schema
+    const refreshToken = user.generateRefreshToken(); // Assuming method exists in the User schema
+
+    // Update the user's refresh token
     user.refreshToken = refreshToken;
-    // save krne me validation lagega but hum user ko hi access krke rakhe hai to problem nhi hai
+
+    // Save user without triggering validation
     await user.save({ validateBeforeSave: false });
 
-    return { refreshToken, accessToken };
+    // Return both tokens
+    return { accessToken, refreshToken };
   } catch (error) {
+    console.error("Error in generateAccessAndRefreshToken:", error.message);
     throw new apiError(
       500,
-      "Something went wrong in generating Access And Refresh Token"
+      "Something went wrong in generating Access and Refresh Tokens"
     );
   }
 };
@@ -108,7 +118,7 @@ const loginUser = asynchandler(async (req, res) => {
   // access and refresh token dono milega
   // send in secure cookies
   const { email, username, password } = req.body;
-  if (!username || !email) {
+  if (!(username || email)) {
     throw new apiError(400, "Please provide  Email or Username");
   }
   const user = await User.findOne({
@@ -118,8 +128,10 @@ const loginUser = asynchandler(async (req, res) => {
   const isPasswordValid = await user.isPasswordCorrect(password);
   if (!isPasswordValid) throw new apiError(400, "Incorrect Password");
 
-  const { refreshToken, accessToken } = generateAccessAndRefreshToken(user._id);
-
+  //aage me await lagana zaruri hai kyunki uss function ke ander me await call tha
+  const { refreshToken, accessToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
   //yaha par jo user ka access mil rha hai usme refresh token nhi tha abhi just  generateAccessAndRefreshToken function me wo add kiya gya hai to ab fir se user ko update krna padega
   const loggedInUser = await User.findOne(user._id).select(
     "-password -refreshToken"
@@ -128,7 +140,8 @@ const loginUser = asynchandler(async (req, res) => {
   //cookie formation
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict", // Optional for security
   };
   return res
     .status(200)
@@ -163,12 +176,55 @@ const logoutUser = asynchandler(async (req, res) => {
     {
       new: true, // isse mujhe new wala refreshToken dega
     }
-  )
+  );
   const options = {
     httpOnly: true,
     secure: true,
-  }
-   return res.status(200).clearCookie("accessToken",options).clearCookie("refreshToken",options).json(200,"User Logout")
+  };
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(200, "User Logout");
 });
+const refreshAccessToken = asynchandler(async (req, res) => {
+  // mujhe refresh token chaiye rahega and usko me cookie se access kr shkta hoon naa
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
+  if (!incomingRefreshToken) throw new apiError(401, "Unauthorized Request");
 
-export { registerUser, loginUser, logoutUser };
+  // yaha pe apne refresh token se verify krwa lenge
+  // verify  function ek token lega and usko access krne ke liye secret lega
+  try {
+    const decodedToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+    );
+    const user = await User.findById(decodedToken?._id);
+  
+    if (!user) throw new apiError(401, "Invalid Refresh token");
+  
+    //ab yaha pe incoming wala refresh token v aa gya hai and ek user ke pass hum save krwa ke rakhe the naa to match krwa lete hai
+    if (incomingRefreshToken !== user.refreshToken)
+      throw new apiError(401, " refresh token is expired");
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+    const { accessToken, newrefreshToken } = await generateAccessAndRefreshToken(
+      user._id
+    );
+  
+    return res
+      .status(201)
+      .cookie("accessToken:", accessToken)
+      .cookie("refreshToken:", newrefreshToken)
+      .json(new apiResponse(200,
+        {accessToken,refreshToken:newrefreshToken},
+        "refreshToken refreshed"
+    ))
+  } catch (error) {
+    throw new apiError(401,"error in refreshing the token")
+  }
+});
+export { registerUser, loginUser, logoutUser, refreshAccessToken };
