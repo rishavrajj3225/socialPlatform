@@ -8,27 +8,25 @@ const App = express();
 
 // console.log(`${process.env.CORS_ORIGIN}`);
 // this is how we can coustomise our cors;
-App.use(cors(
-    {
-        origin:process.env.CORS_ORIGIN,
-        Credential:true
-    }
-))
+// use to take encoded url;
+App.use(express.urlencoded({
+    extended:true,
+    limit:"64kb",
+}))
+App.use(
+  cors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true,
+  })
+);
 // use to limit in form of json;
 App.use(express.json({
     limit:"32kb",
 }));
-// use to take encoded url;
-App.use(express.urlencoded({
-    extended:true,
-    limit:"32kb"
-}))
 // if any public file come then it will store on my local public folder
 App.use(express.static("public"));
 // for safe and secure crud operation on cookie on user browser
 App.use(cookieParser());
-
-
 
 // routes
 import userRouter from "./routes/user.router.js"

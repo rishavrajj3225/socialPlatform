@@ -61,8 +61,14 @@ userSchema.pre("save",async function (next) {
 })
 
 userSchema.methods.isPasswordCorrect = async function (password) {
-    return await bcrypt.compare(password,this.password)
-}
+  
+  if (!password || !this.password) {
+    throw new Error("Password or hash is missing");
+  }
+
+  // Compare the passwords using bcrypt
+  return await bcrypt.compare(password, this.password);
+};
 
 // jwt methods
 // Method to generate an Access Token
@@ -85,15 +91,11 @@ userSchema.methods.generateAccessToken = function () {
 
 // Method to generate a Refresh Token
 userSchema.methods.generateRefreshToken = function () {
-  return jwt.sign(
-    {
-      _id: this._id,
-    },
-    process.env.REFRESH_TOKEN_SECRET, // Secret key for refresh token
-    {
-      expiresIn: process.env.REFRESH_TOKEN_EXPIRY, // Refresh token expiration time
-    }
-  );
+
+  return jwt.sign({ _id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
+    expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+  });
 };
+
 
 export const User = mongoose.model("User", userSchema);

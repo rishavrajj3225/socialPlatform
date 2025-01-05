@@ -1,5 +1,5 @@
 import mongoose from "mongoose"
-
+ // isko agar lagana hai to hum user wale hi hum ek array bna kr rakh lete but ye operation bahut expensive hota kyunki millinons of subscriber ho skte hai to bahut jyada costly ho jayega
 const subscriptionSchema = new mongoose.Schema({
   subscriber: {
     type: mongoose.Schema.Types.ObjectId, // one who is subscribing
