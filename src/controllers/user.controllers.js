@@ -325,12 +325,11 @@ const updateUserCoverImage= asynchandler(async(req,res)=>{
     .status(200)
     .json(new apiResponse(200, user, "Cover Image updated successfully"));
 })
-
 const getUserProfile = asynchandler(async (req, res) => {
-  
   const { username } = req.params;
-  console.log(username);
-  if(!username?.trim){throw new apiError(400,"Username is required");
+  // console.log(username);
+  if (!username?.trim) {
+    throw new apiError(400, "Username is required");
   }
   // const user = await User.find({ username }).select("-password"); aise v kr shkte hai
   // but Aggregate pipeline v yahi pe use ke lete hai
@@ -338,7 +337,6 @@ const getUserProfile = asynchandler(async (req, res) => {
     {
       $match: { username: username?.toLowerCase() },
     },
-    // ab yaha pe bass ek channel aaya hoga sort hoke
     {
       $lookup: {
         from: "subscriptions",
@@ -382,14 +380,18 @@ const getUserProfile = asynchandler(async (req, res) => {
         email: 1,
       },
     },
-    `console.log("channel",channel)`,
   ]);
-  if(!channel.length){
-    throw new apiError(404,"Channel not found");
+
+  // console.log("channel", channel); 
+
+  if (!channel.length) {
+    throw new apiError(404, "Channel not found");
   }
-  // console.log(channel);
-  return res.status(200).json(new apiResponse(200, channel[0], "Channel fetched successfully"));
-  })
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, channel[0], "Channel fetched successfully"));
+});
 
 const getWatchHistory= asynchandler(async(req,res)=>{
   const user = await User.aggregate([
@@ -406,35 +408,39 @@ const getWatchHistory= asynchandler(async(req,res)=>{
         localField: "watchHistory",
         foreignField: "_id",
         as: "watchHistory",
-        pipeline:[
-        {
-            $lookup:{
-              from:"users",
-              localField:"owner",
-              foreignField:"_id",
-              as:"owner",
-              pipeline:[
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
                 {
-                  $project:{
-                    fullName:1,
-                    username:1,
-                    avatar:1,
-                  }
-                }
-              ]
-          }
-        },{
-          $addFields:{
-            owner:{
-              $first:"$owner",
-            }
-          }
-        }
-        ]
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
       },
     },
     {
-      $unwind: {},
+      $unwind: {
+        path: "$watchHistory", 
+        preserveNullAndEmptyArrays: true,
+      },
     },
   ]);
   return res.status(200).json(new apiResponse(
@@ -455,5 +461,4 @@ export {
   updateUserCoverImage,
   getUserProfile,
   getWatchHistory,
-  
 };
