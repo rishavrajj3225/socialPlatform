@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/fileuplod.utils.js";
 import { apiResponse } from "../utils/apiResponse.utils.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 // user ke pass humlog ke function ka access hoga and User ke pass mongo ke function ka access hoga
 const generateAccessAndRefereshTokens = async (userId) => {
   try {
@@ -23,7 +24,6 @@ const generateAccessAndRefereshTokens = async (userId) => {
     );
   }
 };
-
 const registerUser = asynchandler(async (req, res) => {
   //get user details from froentend : username, email,full name ,coverimage , avatar,password
   // validatation - is not empty
@@ -226,7 +226,6 @@ const refreshAccessToken = asynchandler(async (req, res) => {
     throw new apiError(401, error?.message || "Invalid refresh token");
   }
 });
-
 const changeCurrentPassword = asynchandler(async (req, res) => {
   // console.log(req.body);
   const { oldPassword, newPassword, confirmNewPassword } = req.body;
@@ -255,7 +254,6 @@ const getCurrentUser = asynchandler(async (req, res) => {
     message: "Current User Fetched Successfully",
   });
 });
-
 const updateAccountDetails = asynchandler(async (req, res) => {
   const { fullName, email } = req.body;
 
@@ -327,6 +325,124 @@ const updateUserCoverImage= asynchandler(async(req,res)=>{
     .status(200)
     .json(new apiResponse(200, user, "Cover Image updated successfully"));
 })
+
+const getUserProfile = asynchandler(async (req, res) => {
+  
+  const { username } = req.params;
+  console.log(username);
+  if(!username?.trim){throw new apiError(400,"Username is required");
+  }
+  // const user = await User.find({ username }).select("-password"); aise v kr shkte hai
+  // but Aggregate pipeline v yahi pe use ke lete hai
+  const channel = await User.aggregate([
+    {
+      $match: { username: username?.toLowerCase() },
+    },
+    // ab yaha pe bass ek channel aaya hoga sort hoke
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscribersCount: { $size: "$subscribers" },
+        channelsSubscribedCount: { $size: "$subscribedTo" },
+        isSubscribed: {
+          $cond: {
+            if: {
+              $in: [req.user?._id, "$subscribers.subscriber"],
+            },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        coverimage: 1,
+        subscribersCount: 1,
+        channelsSubscribedCount: 1,
+        isSubscribed: 1,
+        email: 1,
+      },
+    },
+    `console.log("channel",channel)`,
+  ]);
+  if(!channel.length){
+    throw new apiError(404,"Channel not found");
+  }
+  // console.log(channel);
+  return res.status(200).json(new apiResponse(200, channel[0], "Channel fetched successfully"));
+  })
+
+const getWatchHistory= asynchandler(async(req,res)=>{
+  const user = await User.aggregate([
+    {
+      // aggrigation pipeline ka code mongoose handle nhi krta hai, ye direct copy oaste hota hai
+      // req.user?._id ye wala to bass string deta hai mongo ka id objectid('string') hota hai
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user?._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline:[
+        {
+            $lookup:{
+              from:"users",
+              localField:"owner",
+              foreignField:"_id",
+              as:"owner",
+              pipeline:[
+                {
+                  $project:{
+                    fullName:1,
+                    username:1,
+                    avatar:1,
+                  }
+                }
+              ]
+          }
+        },{
+          $addFields:{
+            owner:{
+              $first:"$owner",
+            }
+          }
+        }
+        ]
+      },
+    },
+    {
+      $unwind: {},
+    },
+  ]);
+  return res.status(200).json(new apiResponse(
+    200,
+    user[0]?.watchHistory || [],
+    "Watch History fetched successfully"
+  ))
+})
 export {
   registerUser,
   loginUser,
@@ -336,5 +452,8 @@ export {
   getCurrentUser,
   updateAccountDetails,
   updateUserAvatar,
-  updateUserCoverImage
+  updateUserCoverImage,
+  getUserProfile,
+  getWatchHistory,
+  
 };
